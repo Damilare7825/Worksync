@@ -1,0 +1,3 @@
+Reserved for Phase 10.2: Socket.IO handshake authentication middleware
+(JWT verification reusing src/utils/jwt.js's verifyToken, mirroring
+src/middleware/auth.middleware.js). Intentionally empty in Phase 10.1.

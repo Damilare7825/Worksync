@@ -1,0 +1,4 @@
+Reserved for Phase 10.2: workspace/project room join-leave logic
+(e.g. `workspace:{id}`, `project:{id}` rooms), built on top of the
+authenticated socket identity from ./middleware. Intentionally empty
+in Phase 10.1.

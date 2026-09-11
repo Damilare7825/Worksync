@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: #131314;
+    color: #e5e2e3;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Material Design 3 WorkSync Color Tokens */
+.bg-app-background { background-color: #131314; }
+.bg-surface-lowest { background-color: #0e0e0f; }
+.bg-surface-low { background-color: #1c1b1c; }
+.bg-surface-container { background-color: #201f20; }
+.bg-surface-high { background-color: #2a2a2b; }
+.bg-surface-highest { background-color: #353436; }
+
+.text-on-surface { color: #e5e2e3; }
+.text-on-surface-variant { color: #cbc3d7; }
+.text-brand-primary { color: #d0bcff; }
+
+.bg-primary-pill { background-color: #a078ff; color: #ffffff; }
+
+/* Focus Visible Accessibility */
+:focus-visible {
+  outline: 2px solid #d0bcff;
+  outline-offset: 2px;
+}
+
+/* Reduced Motion Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

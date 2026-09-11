@@ -1,0 +1,68 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: worksync_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d worksync_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/worksync_test?schema=public
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/worksync_test?schema=public
+      JWT_SECRET: ci-only-long-random-secret-for-worksync-tests
+      JWT_EXPIRES_IN: 15m
+      CLIENT_URL: http://localhost:5173
+      NODE_ENV: test
+    defaults:
+      run:
+        working-directory: worksync-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: worksync-backend/package-lock.json
+      - run: npm ci
+      - run: npm run prisma:generate
+      - run: npx prisma migrate deploy
+      - run: npm run lint
+      - run: npm test -- --silent
+      - run: npm run test:security:postgres -- --silent
+      - run: npm run test:coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-coverage
+          path: worksync-backend/coverage
+          if-no-files-found: warn
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worksync-frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: worksync-frontend/package-lock.json
+      - run: npm ci
+      - run: npm test

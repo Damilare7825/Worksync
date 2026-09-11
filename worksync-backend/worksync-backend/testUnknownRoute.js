@@ -1,0 +1,1 @@
+const { createApp } = require('./src/app.js');\nconst app = createApp();\nconst request = require('supertest');\n\nrequest(app)\n  .get('/api/v1/unknown-route')\n  .then(res => {\n    console.log('Status:', res.status);\n    console.log('Body:', JSON.stringify(res.body, null, 2));\n  })\n  .catch(err => {\n    console.error('Error:', err);\n  });

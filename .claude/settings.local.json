@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(npx prisma migrate dev --name add-user-preferences)",
+      "PowerShell(npm test)",
+      "PowerShell(type=string>)",
+      "Bash(node scripts/test-r2-live.js)",
+      "Bash(rtk ls *)"
+    ]
+  }
+}
