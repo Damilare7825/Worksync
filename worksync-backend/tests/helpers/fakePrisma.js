@@ -13,6 +13,8 @@ import { randomUUID } from 'crypto';
  * shapes mirror prisma/schema.prisma; keep in sync if the schema changes.
  */
 
+let activeCollections = null;
+
 function matchWhere(record, where = {}) {
   return Object.entries(where).every(([key, val]) => {
     if (key === 'OR' && Array.isArray(val)) {
@@ -62,6 +64,12 @@ function matchWhere(record, where = {}) {
       if (record[key] && typeof record[key] === 'object') {
         return matchWhere(record[key], val);
       }
+      // Relation filter: e.g. project: { status: { not: 'ARCHIVED' } }
+      if (activeCollections && activeCollections[key] && record[`${key}Id`]) {
+        const related = activeCollections[key]._store.find((item) => item.id === record[`${key}Id`]);
+        if (!related) return false;
+        return matchWhere(related, val);
+      }
       // Prisma compound unique key like workspaceId_userId: { workspaceId, userId }
       if (key.includes('_') && typeof val === 'object' && val !== null) {
         return Object.entries(val).every(([subKey, subVal]) => record[subKey] === subVal);
@@ -73,27 +81,41 @@ function matchWhere(record, where = {}) {
 }
 
 
+function attachInclude(record, include) {
+  if (!record) return null;
+  const result = { ...record };
+  if (!include || !activeCollections) return result;
+  for (const [key, incVal] of Object.entries(include)) {
+    if (!incVal) continue;
+    if (activeCollections[key] && record[`${key}Id`]) {
+      const relRecord = activeCollections[key]._store.find((r) => r.id === record[`${key}Id`]);
+      result[key] = relRecord ? { ...relRecord } : null;
+    }
+  }
+  return result;
+}
+
 function createCollection(name, defaults = {}) {
   const store = [];
 
   return {
     _store: store,
-    async findUnique({ where } = {}) {
+    async findUnique({ where, include } = {}) {
       const record = store.find((r) => matchWhere(r, where));
-      return record ? { ...record } : null;
+      return record ? attachInclude(record, include) : null;
     },
-    async findFirst({ where } = {}) {
+    async findFirst({ where, include } = {}) {
       const record = store.find((r) => matchWhere(r, where));
-      return record ? { ...record } : null;
+      return record ? attachInclude(record, include) : null;
     },
-    async findMany({ where = {}, orderBy, skip = 0, take } = {}) {
+    async findMany({ where = {}, include, orderBy, skip = 0, take } = {}) {
       let results = store.filter((r) => matchWhere(r, where));
       if (orderBy?.createdAt === 'desc') {
         results = [...results].sort((a, b) => b.createdAt - a.createdAt);
       }
       if (skip) results = results.slice(skip);
       if (take !== undefined) results = results.slice(0, take);
-      return results;
+      return results.map((r) => attachInclude(r, include));
     },
     async count({ where = {} } = {}) {
       return store.filter((r) => matchWhere(r, where)).length;
@@ -168,7 +190,7 @@ function createCollection(name, defaults = {}) {
 
 export function createFakePrisma() {
   const collections = {
-    user: createCollection('user'),
+    user: createCollection('user', { failedLoginAttempts: 0, lockedUntil: null }),
     userPreference: createCollection('userPreference', { theme: 'SYSTEM', timezone: 'UTC', dateFormat: 'MM/dd/yyyy', timeFormat: 'hh:mm a', compactDensity: false }),
     notificationPreference: createCollection('notificationPreference', { taskAssignments: true, taskUpdates: true, dueDateReminders: true, mentions: true, comments: true, replies: true, reactions: true, workspaceActivity: true, projectActivity: true, invitations: true }),
     workspace: createCollection('workspace'),
@@ -194,6 +216,8 @@ export function createFakePrisma() {
     session: createCollection('session'),
     job: createCollection('job', { status: 'PENDING', attempts: 0, maxAttempts: 3 }),
   };
+
+  activeCollections = collections;
 
   const rawAttachmentCreate = collections.attachment.create.bind(collections.attachment);
   collections.attachment.create = async (args) => {

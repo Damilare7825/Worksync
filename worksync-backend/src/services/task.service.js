@@ -5,6 +5,7 @@ import { logActivity } from './activity.service.js';
 import { createNotification } from './notification.service.js';
 import { emitToProject } from '../sockets/emit.js';
 import { addLabelToTask, removeLabelFromTask } from './label.service.js';
+import { invalidateDashboardCache } from './dashboard.service.js';
 
 async function assertTaskAssigneeIsProjectMember(projectId, assigneeId) {
   if (!assigneeId) return;
@@ -110,6 +111,7 @@ export async function createTask(userId, projectId, data) {
   }
 
   emitToProject(projectId, 'task.created', { task, actorId: userId });
+  invalidateDashboardCache(task.assigneeId);
 
   return task;
 }
@@ -478,6 +480,10 @@ export async function updateTask(userId, taskId, data) {
   }
 
   emitToProject(task.projectId, 'task.updated', { task: updated, actorId: userId });
+  invalidateDashboardCache(task.assigneeId);
+  if (updated.assigneeId && updated.assigneeId !== task.assigneeId) {
+    invalidateDashboardCache(updated.assigneeId);
+  }
 
   return updated;
 }
@@ -504,6 +510,7 @@ export async function deleteTask(userId, taskId) {
   await prisma.task.delete({ where: { id: taskId } });
 
   emitToProject(task.projectId, 'task.deleted', { taskId: task.id, projectId: task.projectId, actorId: userId });
+  invalidateDashboardCache(task.assigneeId);
 }
 
 /**
@@ -724,6 +731,8 @@ export async function bulkUpdateTasks(userId, payload) {
     const batchResults = await Promise.all(batchPromises);
     updatedTasks.push(...batchResults);
   }
+
+  invalidateDashboardCache();
 
   return { updatedCount: updatedTasks.length, tasks: updatedTasks };
 }

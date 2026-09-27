@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { prisma } from '../config/database.js';
 import { BadRequestError, ForbiddenError, NotFoundError, ConflictError } from '../utils/errors.js';
-import { assertWorkspaceMembership, assertWorkspaceRole, getWorkspaceMembership } from './authorization.service.js';
+import { assertWorkspaceMembership, assertWorkspaceRole, getWorkspaceMembership, invalidateWorkspaceAuth } from './authorization.service.js';
 import { logActivity } from './activity.service.js';
 import { env } from '../config/env.js';
 import { hashResetToken } from '../utils/token.js';
@@ -141,6 +141,7 @@ export async function updateMemberRole(actorId, workspaceId, targetMembershipId,
     metadata: { targetUserId: target.userId, newRole },
     isAudit: true,
   });
+  invalidateWorkspaceAuth(workspaceId);
   return updated;
 }
 
@@ -173,6 +174,7 @@ export async function removeMember(actorId, workspaceId, targetMembershipId) {
     metadata: { targetUserId: target.userId },
     isAudit: true,
   });
+  invalidateWorkspaceAuth(workspaceId, target.userId);
 }
 
 // ---------------------------------------------------------------------------
@@ -309,6 +311,7 @@ export async function joinViaInviteLink(userId, rawToken) {
     action: 'USER_JOINED_WORKSPACE',
     metadata: { via: 'invite_link', role: workspace.inviteLinkRole },
   });
+  invalidateWorkspaceAuth(workspace.id, userId);
 
   return { membership, workspace: { id: workspace.id, name: workspace.name } };
 }

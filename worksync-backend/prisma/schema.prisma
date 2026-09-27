@@ -100,6 +100,10 @@ model User {
   resetPasswordTokenHash String?
   resetPasswordExpiresAt DateTime?
 
+  // Account lockout protection against brute-force / credential stuffing
+  failedLoginAttempts    Int       @default(0)
+  lockedUntil            DateTime?
+
   // Intentionally NOT present: a global `role` field. Authorization is
   // always derived from WorkspaceMember / ProjectMember rows — see
   // src/services/authorization.service.js.

@@ -1,5 +1,29 @@
 import { prisma } from '../config/database.js';
 import { ForbiddenError, NotFoundError } from '../utils/errors.js';
+import { appCache } from '../utils/cache.js';
+
+const AUTH_CACHE_TTL_SECONDS = 30;
+
+/**
+ * Invalidation helpers for workspace and project membership mutations.
+ */
+export function invalidateWorkspaceAuth(workspaceId, userId = null) {
+  if (userId) {
+    appCache.del(`auth:ws:${workspaceId}:${userId}`);
+  } else {
+    appCache.delByPrefix(`auth:ws:${workspaceId}:`);
+  }
+  // Workspace membership affects project context lookups as well
+  appCache.delByPrefix('auth:proj:');
+}
+
+export function invalidateProjectAuth(projectId, userId = null) {
+  if (userId) {
+    appCache.del(`auth:proj:${projectId}:${userId}`);
+  } else {
+    appCache.delByPrefix(`auth:proj:${projectId}:`);
+  }
+}
 
 /**
  * All workspace/project access control lives here, in one place, so every
@@ -7,8 +31,8 @@ import { ForbiddenError, NotFoundError } from '../utils/errors.js';
  * WorkspaceMember or ProjectMember directly for authorization purposes.
  *
  * Authentication (`req.user`) answers "who is this?". Everything below
- * answers "what can they do here?" — and always re-derives the answer from
- * the database on every request; nothing is cached on the JWT.
+ * answers "what can they do here?" — re-derived with a short in-memory
+ * TTL cache (30s) invalidated on membership/role changes.
  */
 
 // ---------------------------------------------------------------------------
@@ -16,9 +40,12 @@ import { ForbiddenError, NotFoundError } from '../utils/errors.js';
 // ---------------------------------------------------------------------------
 
 export async function getWorkspaceMembership(userId, workspaceId) {
-  return prisma.workspaceMember.findUnique({
-    where: { workspaceId_userId: { workspaceId, userId } },
-  });
+  const cacheKey = `auth:ws:${workspaceId}:${userId}`;
+  return appCache.wrap(cacheKey, AUTH_CACHE_TTL_SECONDS, () =>
+    prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId } },
+    })
+  );
 }
 
 /**
@@ -63,22 +90,25 @@ export const isWorkspaceAdminOrOwner = (role) => role === 'OWNER' || role === 'A
  * workspace-scoping is never accidentally skipped.
  */
 export async function getProjectContext(userId, projectId) {
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) {
-    throw new NotFoundError('Project not found', 'PROJECT_NOT_FOUND');
-  }
+  const cacheKey = `auth:proj:${projectId}:${userId}`;
+  return appCache.wrap(cacheKey, AUTH_CACHE_TTL_SECONDS, async () => {
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) {
+      throw new NotFoundError('Project not found', 'PROJECT_NOT_FOUND');
+    }
 
-  const workspaceMembership = await getWorkspaceMembership(userId, project.workspaceId);
-  if (!workspaceMembership) {
-    // Same rationale as assertWorkspaceMembership: don't leak existence.
-    throw new NotFoundError('Project not found', 'PROJECT_NOT_FOUND');
-  }
+    const workspaceMembership = await getWorkspaceMembership(userId, project.workspaceId);
+    if (!workspaceMembership) {
+      // Same rationale as assertWorkspaceMembership: don't leak existence.
+      throw new NotFoundError('Project not found', 'PROJECT_NOT_FOUND');
+    }
 
-  const projectMembership = await prisma.projectMember.findUnique({
-    where: { projectId_userId: { projectId, userId } },
+    const projectMembership = await prisma.projectMember.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+    });
+
+    return { project, workspaceMembership, projectMembership };
   });
-
-  return { project, workspaceMembership, projectMembership };
 }
 
 /**

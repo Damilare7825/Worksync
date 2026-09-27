@@ -24,7 +24,8 @@ export const OBVIOUSLY_INSECURE_JWT_SECRETS = [
   '',
 ];
 
-export function validateEnv(rawEnv = process.env, options = { exitOnError: true }) {
+export function validateEnv(rawEnv = process.env, options = {}) {
+  const exitOnError = options.exitOnError !== undefined ? options.exitOnError : (rawEnv.NODE_ENV !== 'test');
   const errors = [];
   const isProd = rawEnv.NODE_ENV === 'production';
 
@@ -53,7 +54,7 @@ export function validateEnv(rawEnv = process.env, options = { exitOnError: true 
   ) {
     if (isProd) {
       errors.push('JWT_SECRET is empty, too short (min 32 chars), or is an insecure placeholder. Production requires a strong, random secret.');
-    } else if (options.exitOnError) {
+    } else if (exitOnError) {
       // eslint-disable-next-line no-console
       console.warn('[config] Development mode: Allowing insecure JWT_SECRET for development only. DO NOT USE IN PRODUCTION.');
     }
@@ -101,7 +102,7 @@ export function validateEnv(rawEnv = process.env, options = { exitOnError: true 
   }
 
   if (errors.length > 0) {
-    if (options.exitOnError) {
+    if (exitOnError) {
       for (const err of errors) {
         // eslint-disable-next-line no-console
         console.error(`[config] ${err}`);
@@ -116,7 +117,7 @@ export function validateEnv(rawEnv = process.env, options = { exitOnError: true 
 }
 
 // Validate process.env upon module initialization
-validateEnv(process.env, { exitOnError: true });
+validateEnv(process.env);
 
 const configuredStorageProvider = (process.env.STORAGE_PROVIDER || 'LOCAL').toUpperCase();
 

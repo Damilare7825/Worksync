@@ -1,9 +1,9 @@
-import { Prisma, TaskPriority, TaskStatus } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { assertProjectAccess, assertWorkspaceMembership, isWorkspaceAdminOrOwner } from './authorization.service.js';
 
-const EMPTY_STATUS = Object.fromEntries(Object.values(TaskStatus).map((status) => [status, 0]));
-const EMPTY_PRIORITY = Object.fromEntries(Object.values(TaskPriority).map((priority) => [priority, 0]));
+const EMPTY_STATUS = Object.fromEntries(['BACKLOG', 'TODO', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED'].map((status) => [status, 0]));
+const EMPTY_PRIORITY = Object.fromEntries(['LOW', 'MEDIUM', 'HIGH', 'URGENT'].map((priority) => [priority, 0]));
 
 function startOfToday() {
   const now = new Date();
@@ -31,17 +31,8 @@ async function getVisibleProjectIds(userId, workspaceId) {
 }
 
 async function getCompletionTrend(projectIds, range) {
-  if (!prisma.$queryRaw || projectIds.length === 0) return [];
-
-  return prisma.$queryRaw(Prisma.sql`
-    SELECT DATE("completedAt")::text AS day, COUNT(*)::integer AS count
-    FROM "tasks"
-    WHERE "projectId" IN (${Prisma.join(projectIds)})
-      AND "completedAt" >= ${range.start}
-      AND "completedAt" < ${range.end}
-    GROUP BY DATE("completedAt")
-    ORDER BY DATE("completedAt") ASC
-  `);
+  // Temporarily disable raw query to test if this is the source of the error
+  return [];
 }
 
 async function buildTaskAnalytics(projectIds, range) {

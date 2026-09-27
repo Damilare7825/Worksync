@@ -8,6 +8,8 @@ import { ConflictError, UnauthorizedError, BadRequestError } from '../utils/erro
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export const MAX_FAILED_LOGIN_ATTEMPTS = 5;
+export const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
 
 // Same pattern as buildInviteUrl (invitation.service.js) and the workspace
 // join link (workspace.service.js) — the raw token belongs in a real,
@@ -66,15 +68,61 @@ export async function loginUser({ email, password }) {
     throw new UnauthorizedError('Invalid email or password', 'INVALID_CREDENTIALS');
   }
 
+  // Account lockout enforcement
+  if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
+    const remainingMinutes = Math.max(1, Math.ceil((new Date(user.lockedUntil).getTime() - Date.now()) / (60 * 1000)));
+    throw new UnauthorizedError(
+      `Account is temporarily locked due to multiple failed login attempts. Please try again in ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'} or reset your password.`,
+      'ACCOUNT_LOCKED'
+    );
+  }
+
   const valid = await comparePassword(password, user.passwordHash);
   if (!valid) {
+    const newAttempts = (user.failedLoginAttempts || 0) + 1;
+    const isNowLocked = newAttempts >= MAX_FAILED_LOGIN_ATTEMPTS;
+    const lockedUntil = isNowLocked ? new Date(Date.now() + LOCKOUT_DURATION_MS) : null;
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: newAttempts,
+        lockedUntil: isNowLocked ? lockedUntil : user.lockedUntil,
+      },
+    });
+
+    if (isNowLocked) {
+      throw new UnauthorizedError(
+        'Account has been temporarily locked due to multiple failed login attempts. Please try again in 15 minutes or reset your password.',
+        'ACCOUNT_LOCKED'
+      );
+    }
+
     throw new UnauthorizedError('Invalid email or password', 'INVALID_CREDENTIALS');
+  }
+
+  // Reset failed attempts upon successful login
+  if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+      },
+    });
   }
 
   const refreshToken = generateRefreshToken();
   const session = await createSession(user.id, refreshToken);
   const token = signToken({ userId: user.id, email: user.email, sessionId: session.id });
-  const { passwordHash: _omit, ...safeUser } = user;
+  const {
+    passwordHash: _omit,
+    resetPasswordTokenHash: _omit2,
+    resetPasswordExpiresAt: _omit3,
+    failedLoginAttempts: _omit4,
+    lockedUntil: _omit5,
+    ...safeUser
+  } = user;
   return { user: safeUser, token, refreshToken };
 }
 
@@ -160,6 +208,8 @@ export async function resetPassword({ token, password }) {
       passwordHash,
       resetPasswordTokenHash: null,
       resetPasswordExpiresAt: null,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
     },
   });
 
@@ -184,6 +234,8 @@ export async function changePassword(userId, { currentPassword, newPassword }) {
       passwordHash,
       resetPasswordTokenHash: null,
       resetPasswordExpiresAt: null,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
     },
   });
 

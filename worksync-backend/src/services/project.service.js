@@ -8,6 +8,7 @@ import {
   getProjectContext,
   getWorkspaceMembership,
   isWorkspaceAdminOrOwner,
+  invalidateProjectAuth,
 } from './authorization.service.js';
 import { logActivity } from './activity.service.js';
 
@@ -100,6 +101,7 @@ export async function updateProject(userId, projectId, data) {
     entityId: project.id,
     entityLabel: updated.name,
   });
+  invalidateProjectAuth(project.id);
   return updated;
 }
 
@@ -127,6 +129,7 @@ export async function archiveProject(userId, projectId) {
     entityLabel: updated.name,
     isAudit: true,
   });
+  invalidateProjectAuth(projectId);
   return updated;
 }
 
@@ -152,6 +155,7 @@ export async function restoreProject(userId, projectId, targetStatus = 'ACTIVE')
     entityLabel: updated.name,
     isAudit: true,
   });
+  invalidateProjectAuth(projectId);
   return updated;
 }
 
@@ -161,6 +165,7 @@ export async function deleteProject(userId, projectId) {
   const { project } = await getProjectContext(userId, projectId);
   await assertWorkspaceRole(userId, project.workspaceId, ['OWNER']);
   await prisma.project.delete({ where: { id: project.id } });
+  invalidateProjectAuth(projectId);
 }
 
 export async function listProjectMembers(userId, projectId) {
@@ -197,6 +202,7 @@ export async function addProjectMember(userId, projectId, { userId: targetUserId
     action: 'PROJECT_MEMBER_ADDED',
     metadata: { targetUserId, role },
   });
+  invalidateProjectAuth(projectId, targetUserId);
   return member;
 }
 
@@ -217,6 +223,7 @@ export async function updateProjectMember(userId, projectId, memberId, role) {
     metadata: { targetUserId: target.userId, newRole: role },
     isAudit: true,
   });
+  invalidateProjectAuth(projectId, target.userId);
   return updated;
 }
 
@@ -237,6 +244,7 @@ export async function removeProjectMember(userId, projectId, memberId) {
     metadata: { targetUserId: target.userId },
     isAudit: true,
   });
+  invalidateProjectAuth(projectId, target.userId);
 }
 
 /**

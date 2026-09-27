@@ -29,3 +29,36 @@ export const authLimiter = rateLimit({
     error: { code: 'RATE_LIMITED' },
   },
 });
+
+/**
+ * Dedicated limiter for password reset requests to prevent email bombing
+ * and token harvesting attacks.
+ */
+export const passwordResetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many password reset attempts, please try again later',
+    error: { code: 'RATE_LIMITED' },
+  },
+});
+
+/**
+ * Limiter for public invite links and workspace joining endpoints.
+ */
+export const inviteLinkLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many invite verification attempts, please try again later',
+    error: { code: 'RATE_LIMITED' },
+  },
+});
+
+\n

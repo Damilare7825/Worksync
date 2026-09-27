@@ -92,14 +92,41 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/nginx/ssl:/etc/nginx/ssl:ro
+      - ./deploy/certbot/www:/var/www/certbot:ro
     depends_on:
       api:
         condition: service_healthy
       frontend:
         condition: service_started
 
+  db-backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      BACKUP_DIR: /backups
+      RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - backup_data:/backups
+      - ./scripts/backup-db.sh:/usr/local/bin/backup-db.sh:ro
+    command: >
+      sh -c '
+        echo "0 2 * * * /usr/local/bin/backup-db.sh >> /var/log/cron.log 2>&1" > /etc/crontabs/root
+        crond -f -l 2
+      '
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   uploads_data:
+  backup_data:

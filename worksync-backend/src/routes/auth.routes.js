@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as authController from '../controllers/auth.controller.js';
 import { validate } from '../middleware/validation.middleware.js';
 import { authenticate } from '../middleware/auth.middleware.js';
-import { authLimiter } from '../middleware/rateLimit.middleware.js';
+import { authLimiter, passwordResetLimiter } from '../middleware/rateLimit.middleware.js';
 import {
   registerSchema,
   loginSchema,
@@ -22,11 +22,11 @@ router.get('/me', authenticate, authController.me);
 router.post('/refresh', authLimiter, authController.refresh);
 router.post('/logout', authenticate, authController.logout);
 
-// authLimiter is reused here too: forgot-password is a common brute-force /
-// enumeration / email-bombing target, same as login.
+// passwordResetLimiter: strict limiter for forgot-password to mitigate
+// email bombing, credential harvesting, and reset-token generation spam.
 router.post(
   '/forgot-password',
-  authLimiter,
+  passwordResetLimiter,
   validate({ body: forgotPasswordSchema }),
   authController.forgotPassword
 );

@@ -9,3 +9,4 @@ uploads/
 .uploads/
 *.log
 .DS_Store
+.claude/settings.json

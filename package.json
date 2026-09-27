@@ -1,0 +1,18 @@
+{
+  "name": "worksync",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "WorkSync - Collaborative Task Management & Productivity Platform",
+  "scripts": {
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "npm test --prefix worksync-backend",
+    "test:frontend": "npm test --prefix worksync-frontend",
+    "test:e2e": "npm test --prefix worksync-backend -- tests/phase25-e2e-user-journey.test.js",
+    "test:coverage": "npm run test:coverage --prefix worksync-backend",
+    "lint": "npm run lint --prefix worksync-backend && npm run lint --prefix worksync-frontend",
+    "build": "npm run build --prefix worksync-frontend",
+    "db:migrate": "npm run prisma:migrate --prefix worksync-backend",
+    "db:deploy": "npm run prisma:deploy --prefix worksync-backend"
+  }
+}
