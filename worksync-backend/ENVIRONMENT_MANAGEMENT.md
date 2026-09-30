@@ -20,6 +20,7 @@ This document defines the environment architecture, variable validation rules, s
 | Variable | Required in Prod | Default | Purpose |
 |---|---|---|---|
 | `DATABASE_URL` | **Yes** | — | PostgreSQL connection string (SSL required in prod; placeholders rejected) |
+| `DIRECT_URL` | **Yes** | — | Direct or session-mode PostgreSQL URI used by Prisma CLI migrations; keep separate from a transaction-pooled runtime URL |
 | `JWT_SECRET` | **Yes** | — | HMAC-SHA256 signing secret for access JWTs (minimum 32 characters; placeholders rejected in prod) |
 | `JWT_EXPIRES_IN` | No | `15m` | Short-lived access JWT token expiration duration (default: 15 minutes) |
 | `PORT` | No | `5000` | HTTP server listening port |
@@ -75,6 +76,7 @@ WorkSync enforces strict fail-closed validation on startup via [`src/config/env.
 
 1. **Database Validation**:
    - `DATABASE_URL` must be non-empty and non-whitespace across all environments.
+   - `DIRECT_URL` must point to a PostgreSQL direct/session connection suitable for Prisma migrations (not Supabase transaction mode on port `6543`).
    - In `production`, `DATABASE_URL` must not contain unconfigured template placeholders (e.g., `GENERATE_A_LONG_RANDOM_DATABASE_PASSWORD`).
 2. **JWT Secret Validation**:
    - `JWT_SECRET` must be non-empty and non-whitespace across all environments.
