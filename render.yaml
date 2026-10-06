@@ -17,10 +17,7 @@ services:
       - key: DIRECT_URL
         sync: false
       - key: CLIENT_URL
-        fromService:
-          type: web
-          name: worksync-frontend
-          envVarKey: RENDER_EXTERNAL_URL
+        sync: false
       - key: STORAGE_PROVIDER
         value: S3
       - key: STORAGE_BUCKET
@@ -46,19 +43,3 @@ services:
       - key: EMAIL_FROM
         sync: false
 
-  - type: web
-    name: worksync-frontend
-    runtime: static
-    rootDir: worksync-frontend
-    buildCommand: npm ci && npm run build
-    staticPublishPath: dist
-    envVars:
-      - key: VITE_API_URL
-        fromService:
-          type: web
-          name: worksync-api
-          envVarKey: RENDER_EXTERNAL_URL
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
